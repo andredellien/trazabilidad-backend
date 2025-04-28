@@ -1,3 +1,4 @@
+// controllers/lote.controller.js
 const loteModel = require("../models/lote.model");
 
 async function getAll(req, res) {
@@ -26,9 +27,30 @@ async function getById(req, res) {
 
 async function create(req, res) {
 	try {
-		const { IdMateriaPrima, FechaCreacion, Estado } = req.body;
-		await loteModel.create({ IdMateriaPrima, FechaCreacion, Estado });
-		res.status(201).json({ message: "Lote creado exitosamente" });
+		const { Nombre, FechaCreacion, Estado, MateriasPrimas } = req.body;
+
+		if (!Nombre || !FechaCreacion || !Array.isArray(MateriasPrimas)) {
+			return res.status(400).json({ message: "Datos incompletos" });
+		}
+
+		const isValid = MateriasPrimas.every(
+			(mp) => mp.IdMateriaPrima && mp.Cantidad >= 0
+		);
+		if (!isValid) {
+			return res
+				.status(400)
+				.json({ message: "Estructura de materias primas inválida" });
+		}
+
+		const newId = await loteModel.create({
+			Nombre,
+			FechaCreacion,
+			Estado,
+			MateriasPrimas,
+		});
+		res
+			.status(201)
+			.json({ message: "Lote creado exitosamente", IdLote: newId });
 	} catch (error) {
 		console.error("Error al crear el lote:", error);
 		res.status(500).json({ message: "Error al crear el lote" });
@@ -37,14 +59,25 @@ async function create(req, res) {
 
 async function update(req, res) {
 	const { id } = req.params;
-	const { IdMateriaPrima, FechaCreacion, Estado } = req.body;
+	const { Nombre, FechaCreacion, Estado, MateriasPrimas } = req.body;
+
 	try {
-		const rowsAffected = await loteModel.update(id, {
-			IdMateriaPrima,
+		const isValid = MateriasPrimas.every(
+			(mp) => mp.IdMateriaPrima && mp.Cantidad >= 0
+		);
+		if (!isValid) {
+			return res
+				.status(400)
+				.json({ message: "Estructura de materias primas inválida" });
+		}
+
+		const updated = await loteModel.update(id, {
+			Nombre,
 			FechaCreacion,
 			Estado,
+			MateriasPrimas,
 		});
-		if (rowsAffected === 0) {
+		if (!updated) {
 			return res
 				.status(404)
 				.json({ message: "Lote no encontrado para actualizar" });

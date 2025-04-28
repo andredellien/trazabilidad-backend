@@ -3,55 +3,202 @@ const { getConnection, sql } = require("../config/dbConfig");
 
 async function findAll() {
 	const pool = await getConnection();
-	const result = await pool.request().query("SELECT * FROM Lote");
-	return result.recordset;
+	const result = await pool.request().query(`
+    SELECT
+      L.IdLote, L.Nombre, L.FechaCreacion, L.Estado,
+      M.IdMateriaPrima, M.Nombre AS NombreMateria,
+      LM.Cantidad
+    FROM Lote L
+    LEFT JOIN LoteMateriaPrima LM ON L.IdLote = LM.IdLote
+    LEFT JOIN MateriaPrima M ON LM.IdMateriaPrima = M.IdMateriaPrima
+    ORDER BY L.IdLote DESC
+  `);
+
+	const lotes = {};
+	for (const row of result.recordset) {
+		if (!lotes[row.IdLote]) {
+			lotes[row.IdLote] = {
+				IdLote: row.IdLote,
+				Nombre: row.Nombre,
+				FechaCreacion: row.FechaCreacion,
+				Estado: row.Estado,
+				MateriasPrimas: [],
+			};
+		}
+		if (row.IdMateriaPrima) {
+			lotes[row.IdLote].MateriasPrimas.push({
+				IdMateriaPrima: row.IdMateriaPrima,
+				Nombre: row.NombreMateria,
+				Cantidad: row.Cantidad,
+			});
+		}
+	}
+
+	return Object.values(lotes);
 }
 
 async function findById(id) {
 	const pool = await getConnection();
+	const result = await pool.request().input("IdLote", sql.Int, id).query(`
+      SELECT
+        L.IdLote, L.Nombre, L.FechaCreacion, L.Estado,
+        M.IdMateriaPrima, M.Nombre AS NombreMateria,
+        LM.Cantidad
+      FROM Lote L
+      LEFT JOIN LoteMateriaPrima LM ON L.IdLote = LM.IdLote
+      LEFT JOIN MateriaPrima M ON LM.IdMateriaPrima = M.IdMateriaPrima
+      WHERE L.IdLote = @IdLote
+    `);
+
+	if (result.recordset.length === 0) return null;
+
+	const lote = {
+		IdLote: result.recordset[0].IdLote,
+		Nombre: result.recordset[0].Nombre,
+		FechaCreacion: result.recordset[0].FechaCreacion,
+		Estado: result.recordset[0].Estado,
+		MateriasPrimas: result.recordset
+			.filter((r) => r.IdMateriaPrima)
+			.map((r) => ({
+				IdMateriaPrima: r.IdMateriaPrima,
+				Nombre: r.NombreMateria,
+				Cantidad: r.Cantidad,
+			})),
+	};
+
+	return lote;
+}
+
+async function create({ Nombre, FechaCreacion, Estado, MateriasPrimas }) {
+	const pool = await getConnection();
+
 	const result = await pool
 		.request()
-		.input("IdLote", sql.Int, id)
-		.query("SELECT * FROM Lote WHERE IdLote = @IdLote");
-	return result.recordset[0];
-}
-
-async function create({ IdMateriaPrima, FechaCreacion, Estado }) {
-	const pool = await getConnection();
-	const insertResult = await pool
-		.request()
-		.input("IdMateriaPrima", sql.Int, IdMateriaPrima)
+		.input("Nombre", sql.VarChar(100), Nombre)
 		.input("FechaCreacion", sql.Date, FechaCreacion)
-		.input("Estado", sql.VarChar(50), Estado || null).query(`
-      INSERT INTO Lote (IdMateriaPrima, FechaCreacion, Estado)
-      VALUES (@IdMateriaPrima, @FechaCreacion, @Estado)
+		.input("Estado", sql.VarChar(50), Estado).query(`
+      INSERT INTO Lote (Nombre, FechaCreacion, Estado)
+      OUTPUT INSERTED.IdLote
+      VALUES (@Nombre, @FechaCreacion, @Estado)
     `);
-	return insertResult.rowsAffected[0];
+
+	const newId = result.recordset[0].IdLote;
+
+	for (let mp of MateriasPrimas || []) {
+		await pool
+			.request()
+			.input("IdLote", sql.Int, newId)
+			.input("IdMateriaPrima", sql.Int, mp.IdMateriaPrima)
+			.input("Cantidad", sql.Decimal(10, 2), mp.Cantidad).query(`
+        INSERT INTO LoteMateriaPrima (IdLote, IdMateriaPrima, Cantidad)
+        VALUES (@IdLote, @IdMateriaPrima, @Cantidad)
+      `);
+
+		await pool
+			.request()
+			.input("IdMateriaPrima", sql.Int, mp.IdMateriaPrima)
+			.input("Cantidad", sql.Decimal(10, 2), mp.Cantidad).query(`
+        UPDATE MateriaPrima
+        SET Cantidad = Cantidad - @Cantidad
+        WHERE IdMateriaPrima = @IdMateriaPrima
+      `);
+	}
+
+	return newId;
 }
 
-async function update(id, { IdMateriaPrima, FechaCreacion, Estado }) {
+async function update(id, { Nombre, FechaCreacion, Estado, MateriasPrimas }) {
 	const pool = await getConnection();
-	const updateResult = await pool
+
+	// Revertir cantidades originales
+	const prev = await pool
 		.request()
 		.input("IdLote", sql.Int, id)
-		.input("IdMateriaPrima", sql.Int, IdMateriaPrima)
+		.query(
+			`SELECT IdMateriaPrima, Cantidad FROM LoteMateriaPrima WHERE IdLote = @IdLote`
+		);
+
+	for (let old of prev.recordset) {
+		await pool
+			.request()
+			.input("IdMateriaPrima", sql.Int, old.IdMateriaPrima)
+			.input("Cantidad", sql.Decimal(10, 2), old.Cantidad).query(`
+        UPDATE MateriaPrima
+        SET Cantidad = Cantidad + @Cantidad
+        WHERE IdMateriaPrima = @IdMateriaPrima
+      `);
+	}
+
+	await pool
+		.request()
+		.input("IdLote", sql.Int, id)
+		.input("Nombre", sql.VarChar(100), Nombre)
 		.input("FechaCreacion", sql.Date, FechaCreacion)
 		.input("Estado", sql.VarChar(50), Estado).query(`
       UPDATE Lote
-      SET IdMateriaPrima = @IdMateriaPrima,
-          FechaCreacion = @FechaCreacion,
-          Estado = @Estado
+      SET Nombre = @Nombre, FechaCreacion = @FechaCreacion, Estado = @Estado
       WHERE IdLote = @IdLote
     `);
-	return updateResult.rowsAffected[0];
+
+	await pool
+		.request()
+		.input("IdLote", sql.Int, id)
+		.query(`DELETE FROM LoteMateriaPrima WHERE IdLote = @IdLote`);
+
+	for (let mp of MateriasPrimas || []) {
+		await pool
+			.request()
+			.input("IdLote", sql.Int, id)
+			.input("IdMateriaPrima", sql.Int, mp.IdMateriaPrima)
+			.input("Cantidad", sql.Decimal(10, 2), mp.Cantidad).query(`
+        INSERT INTO LoteMateriaPrima (IdLote, IdMateriaPrima, Cantidad)
+        VALUES (@IdLote, @IdMateriaPrima, @Cantidad)
+      `);
+
+		await pool
+			.request()
+			.input("IdMateriaPrima", sql.Int, mp.IdMateriaPrima)
+			.input("Cantidad", sql.Decimal(10, 2), mp.Cantidad).query(`
+        UPDATE MateriaPrima
+        SET Cantidad = Cantidad - @Cantidad
+        WHERE IdMateriaPrima = @IdMateriaPrima
+      `);
+	}
+
+	return true;
 }
 
 async function remove(id) {
 	const pool = await getConnection();
+
+	// Restaurar stock antes de eliminar
+	const prev = await pool
+		.request()
+		.input("IdLote", sql.Int, id)
+		.query(
+			`SELECT IdMateriaPrima, Cantidad FROM LoteMateriaPrima WHERE IdLote = @IdLote`
+		);
+
+	for (let old of prev.recordset) {
+		await pool
+			.request()
+			.input("IdMateriaPrima", sql.Int, old.IdMateriaPrima)
+			.input("Cantidad", sql.Decimal(10, 2), old.Cantidad).query(`
+        UPDATE MateriaPrima
+        SET Cantidad = Cantidad + @Cantidad
+        WHERE IdMateriaPrima = @IdMateriaPrima
+      `);
+	}
+
+	await pool
+		.request()
+		.input("IdLote", sql.Int, id)
+		.query(`DELETE FROM LoteMateriaPrima WHERE IdLote = @IdLote`);
 	const deleteResult = await pool
 		.request()
 		.input("IdLote", sql.Int, id)
-		.query("DELETE FROM Lote WHERE IdLote = @IdLote");
+		.query(`DELETE FROM Lote WHERE IdLote = @IdLote`);
+
 	return deleteResult.rowsAffected[0];
 }
 
