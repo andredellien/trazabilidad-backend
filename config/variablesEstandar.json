@@ -1,0 +1,108 @@
+{
+	"1": {
+		"numero": 1,
+		"nombre": "Balanza",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583844/Image_hlmonj.jpg",
+		"variables": {
+			"peso": { "min": 20, "max": 40 },
+			"grosor": { "min": 2, "max": 5 }
+		}
+	},
+	"2": {
+		"numero": 2,
+		"nombre": "Lavadora",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583845/Image_2_zfjfbf.jpg",
+		"variables": {
+			"tiempoLavado": { "min": 60, "max": 90 }
+		}
+	},
+	"3": {
+		"numero": 3,
+		"nombre": "Peladora",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583845/Image_4_sgcwn2.jpg",
+		"variables": {
+			"tiempoPelado": { "min": 30, "max": 60 }
+		}
+	},
+	"4": {
+		"numero": 4,
+		"nombre": "Tanque de remojo",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583846/Image_nctozd.png",
+		"variables": {
+			"tiempoRemojo": { "min": 120, "max": 180 },
+			"temperaturaAgua": { "min": 15, "max": 25 }
+		}
+	},
+	"5": {
+		"numero": 5,
+		"nombre": "Cocción y enfriado",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583843/Image_1_bnyeyz.jpg",
+		"variables": {
+			"tiempoCoccion": { "min": 45, "max": 60 },
+			"temperatura": { "min": 80, "max": 100 }
+		}
+	},
+	"6": {
+		"numero": 6,
+		"nombre": "TR-101",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583844/Image_5_gcthfo.jpg",
+		"variables": {
+			"velocidad": { "min": 100, "max": 150 },
+			"tiempoOperacion": { "min": 10, "max": 20 }
+		}
+	},
+	"7": {
+		"numero": 7,
+		"nombre": "Tanque mezcla",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583844/Image_6_udazm0.jpg",
+		"variables": {
+			"tiempoMezcla": { "min": 30, "max": 50 },
+			"consistencia": { "min": 3, "max": 5 }
+		}
+	},
+	"8": {
+		"numero": 8,
+		"nombre": "Deshidratador",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583843/Image_7_pnhjev.jpg",
+		"variables": {
+			"tiempoDeshidratado": { "min": 240, "max": 300 },
+			"temperatura": { "min": 45, "max": 60 }
+		}
+	},
+	"9": {
+		"numero": 9,
+		"nombre": "Máquina de Molido",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583843/Image_8_ybk5u7.jpg",
+		"variables": {
+			"velocidadMolido": { "min": 1000, "max": 1500 },
+			"tamanoParticula": { "min": 1, "max": 2 }
+		}
+	},
+	"10": {
+		"numero": 10,
+		"nombre": "TT-101",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583843/Image_9_akusco.jpg",
+		"variables": {
+			"temperaturaControl": { "min": 25, "max": 35 },
+			"tiempo": { "min": 20, "max": 30 }
+		}
+	},
+	"11": {
+		"numero": 11,
+		"nombre": "Mezcladora",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746599118/Image_11_usp3jg.jpg",
+		"variables": {
+			"tiempoMezclado": { "min": 15, "max": 25 },
+			"velocidad": { "min": 50, "max": 80 }
+		}
+	},
+	"12": {
+		"numero": 12,
+		"nombre": "Envasadora y llenadora",
+		"imagen": "https://res.cloudinary.com/dtnweo7db/image/upload/v1746583843/Image_10_brhvk7.jpg",
+		"variables": {
+			"precisiónLlenado": { "min": 95, "max": 100 },
+			"tiempoSellado": { "min": 3, "max": 5 }
+		}
+	}
+}

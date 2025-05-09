@@ -13,6 +13,9 @@ const variableProcesoRoutes = require("./routes/variableProceso.routes");
 const controlCalidadRoutes = require("./routes/controlCalidad.routes");
 const authRoutes = require("./routes/auth.routes");
 const verifyToken = require("./middlewares/verifyToken");
+const procesoTransformacionRoutes = require("./routes/procesoTransformacion.routes");
+const procesoEvaluacionRoutes = require("./routes/procesoEvaluacion.routes");
+const maquinaRoutes = require("./routes/maquina.routes");
 
 // Activar CORS en toda la aplicación
 app.use(cors());
@@ -27,6 +30,9 @@ app.use("/api/proceso", procesoRoutes);
 app.use("/api/variable-proceso", variableProcesoRoutes);
 app.use("/api/control-calidad", controlCalidadRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/proceso-transformacion", procesoTransformacionRoutes);
+app.use("/api/proceso-evaluacion", procesoEvaluacionRoutes);
+app.use("/api", maquinaRoutes);
 
 // Iniciar el servidor
 app.listen(PORT, () => {
