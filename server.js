@@ -1,4 +1,5 @@
 // server.js
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const cors = require("cors");
@@ -26,13 +27,14 @@ app.use(express.json());
 app.use("/api/materia-prima", materiaPrimaRoutes);
 app.use("/api/lote", loteRoutes);
 app.use("/api/operador", operadorRoutes);
-app.use("/api/proceso", procesoRoutes);
 app.use("/api/variable-proceso", variableProcesoRoutes);
 app.use("/api/control-calidad", controlCalidadRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/proceso-transformacion", procesoTransformacionRoutes);
 app.use("/api/proceso-evaluacion", procesoEvaluacionRoutes);
 app.use("/api", maquinaRoutes);
+app.use("/api/procesos", procesoRoutes);
+app.use("/api/maquinas", maquinaRoutes);
 
 // Iniciar el servidor
 app.listen(PORT, () => {

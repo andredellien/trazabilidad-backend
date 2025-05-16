@@ -1,19 +1,28 @@
 const express = require("express");
 const router = express.Router();
-const path = require("path");
-const fs = require("fs");
+const multer = require("multer");
+const { storage } = require("../config/cloudinary");
+const upload = multer({ storage });
 
-router.get("/maquinas", (req, res) => {
-	const ruta = path.join(__dirname, "..", "config", "variablesEstandar.json");
+const maquinaController = require("../controllers/maquina.controller");
 
+// 📤 Subir imagen a Cloudinary
+router.post("/upload", upload.single("imagen"), async (req, res) => {
 	try {
-		const data = fs.readFileSync(ruta, "utf8");
-		const maquinas = JSON.parse(data);
-		res.json(maquinas);
+		if (!req.file || !req.file.path) {
+			return res.status(400).json({ message: "Archivo no recibido" });
+		}
+		res.json({ imageUrl: req.file.path });
 	} catch (error) {
-		console.error("Error al leer variablesEstandar:", error);
-		res.status(500).json({ error: "Error al obtener máquinas" });
+		console.error("Error al subir imagen:", error);
+		res.status(500).json({ message: "Error al subir imagen" });
 	}
 });
+
+// 📄 Guardar máquina con nombre e imagen
+router.post("/", maquinaController.crear);
+
+// 📋 Listar todas las máquinas
+router.get("/", maquinaController.listar);
 
 module.exports = router;

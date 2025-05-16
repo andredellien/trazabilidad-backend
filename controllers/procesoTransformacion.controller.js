@@ -14,15 +14,28 @@ async function registrarFormulario(req, res) {
 	const valores = req.body;
 
 	try {
-		const estandar = cargarVariablesEstandar(numeroMaquina);
-		const variablesEstandar = estandar.variables;
-		const nombreMaquina = estandar.nombre;
+		// 🔄 Obtener la lista completa de máquinas del proceso asignado al lote
+		const maquinas = await model.obtenerProcesoDeLote(parseInt(idLote));
+		const maquina = maquinas.find((m) => m.Numero === parseInt(numeroMaquina));
 
-		// Validación
+		if (!maquina) {
+			return res
+				.status(404)
+				.json({ message: "Máquina no encontrada en el proceso asignado" });
+		}
+
+		const variablesEstandar = maquina.Variables;
+		const nombreMaquina = maquina.Nombre;
+
+		// ✅ Validación: comparar valores ingresados con rango min/max
 		let cumple = true;
-		for (const [clave, valor] of Object.entries(valores)) {
-			const regla = variablesEstandar[clave];
-			if (!regla || valor < regla.min || valor > regla.max) {
+		for (const v of variablesEstandar) {
+			const valorIngresado = valores[v.Nombre];
+			if (
+				valorIngresado === undefined ||
+				valorIngresado < v.ValorMin ||
+				valorIngresado > v.ValorMax
+			) {
 				cumple = false;
 				break;
 			}
@@ -63,7 +76,18 @@ async function obtenerFormulario(req, res) {
 	}
 }
 
+async function obtenerProcesoDeLote(req, res) {
+	try {
+		const data = await model.obtenerProcesoDeLote(parseInt(req.params.idLote));
+		res.json(data);
+	} catch (err) {
+		console.error("Error al obtener proceso:", err);
+		res.status(500).json({ message: "Error interno" });
+	}
+}
+
 module.exports = {
 	registrarFormulario,
 	obtenerFormulario,
+	obtenerProcesoDeLote,
 };

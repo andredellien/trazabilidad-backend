@@ -1,4 +1,3 @@
-// controllers/lote.controller.js
 const loteModel = require("../models/lote.model");
 
 async function getAll(req, res) {
@@ -27,27 +26,38 @@ async function getById(req, res) {
 
 async function create(req, res) {
 	try {
-		const { Nombre, FechaCreacion, Estado, MateriasPrimas } = req.body;
+		const { Nombre, FechaCreacion, Estado, IdProceso, MateriasPrimas } =
+			req.body;
 
-		if (!Nombre || !FechaCreacion || !Array.isArray(MateriasPrimas)) {
-			return res.status(400).json({ message: "Datos incompletos" });
+		if (!Nombre || !FechaCreacion) {
+			return res.status(400).json({ message: "Faltan datos obligatorios" });
 		}
 
-		const isValid = MateriasPrimas.every(
-			(mp) => mp.IdMateriaPrima && mp.Cantidad >= 0
-		);
-		if (!isValid) {
+		if (MateriasPrimas && !Array.isArray(MateriasPrimas)) {
 			return res
 				.status(400)
-				.json({ message: "Estructura de materias primas inválida" });
+				.json({ message: "MateriasPrimas debe ser un arreglo" });
+		}
+
+		if (Array.isArray(MateriasPrimas)) {
+			const isValid = MateriasPrimas.every(
+				(mp) => mp.IdMateriaPrima && mp.Cantidad >= 0
+			);
+			if (!isValid) {
+				return res
+					.status(400)
+					.json({ message: "Estructura de materias primas inválida" });
+			}
 		}
 
 		const newId = await loteModel.create({
 			Nombre,
 			FechaCreacion,
 			Estado,
-			MateriasPrimas,
+			IdProceso,
+			MateriasPrimas: MateriasPrimas || [],
 		});
+
 		res
 			.status(201)
 			.json({ message: "Lote creado exitosamente", IdLote: newId });
@@ -59,29 +69,40 @@ async function create(req, res) {
 
 async function update(req, res) {
 	const { id } = req.params;
-	const { Nombre, FechaCreacion, Estado, MateriasPrimas } = req.body;
+	const { Nombre, FechaCreacion, Estado, IdProceso, MateriasPrimas } = req.body;
 
 	try {
-		const isValid = MateriasPrimas.every(
-			(mp) => mp.IdMateriaPrima && mp.Cantidad >= 0
-		);
-		if (!isValid) {
+		if (MateriasPrimas && !Array.isArray(MateriasPrimas)) {
 			return res
 				.status(400)
-				.json({ message: "Estructura de materias primas inválida" });
+				.json({ message: "MateriasPrimas debe ser un arreglo" });
+		}
+
+		if (Array.isArray(MateriasPrimas)) {
+			const isValid = MateriasPrimas.every(
+				(mp) => mp.IdMateriaPrima && mp.Cantidad >= 0
+			);
+			if (!isValid) {
+				return res
+					.status(400)
+					.json({ message: "Estructura de materias primas inválida" });
+			}
 		}
 
 		const updated = await loteModel.update(id, {
 			Nombre,
 			FechaCreacion,
 			Estado,
-			MateriasPrimas,
+			IdProceso,
+			MateriasPrimas: MateriasPrimas || [],
 		});
+
 		if (!updated) {
 			return res
 				.status(404)
 				.json({ message: "Lote no encontrado para actualizar" });
 		}
+
 		res.json({ message: "Lote actualizado exitosamente" });
 	} catch (error) {
 		console.error("Error al actualizar el lote:", error);
