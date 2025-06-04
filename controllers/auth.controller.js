@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const { createUser, findByUsuario } = require("../models/auth.model");
+const { createUser, findByUsuario, findById } = require("../models/auth.model");
 
 const JWT_SECRET = process.env.JWT_SECRET || "super‑secreto";
 
@@ -39,5 +39,23 @@ exports.login = async (req, res) => {
 		res.json({ token });
 	} catch (err) {
 		res.status(500).json({ message: "Error al iniciar sesión" });
+	}
+};
+
+exports.getMe = async (req, res) => {
+	try {
+		const userId = req.user.id;
+		const user = await findById(userId);
+		
+		if (!user) {
+			return res.status(404).json({ message: "Usuario no encontrado" });
+		}
+
+		// Remove sensitive information
+		const { PasswordHash, ...userInfo } = user;
+		res.json(userInfo);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ message: "Error al obtener información del usuario" });
 	}
 };

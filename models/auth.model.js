@@ -25,4 +25,13 @@ async function findByUsuario(usuario) {
 	return res.recordset[0];
 }
 
-module.exports = { createUser, findByUsuario };
+async function findById(id) {
+	const pool = await getConnection();
+	const res = await pool
+		.request()
+		.input("IdOperador", sql.Int, id)
+		.query("SELECT * FROM Operador WHERE IdOperador = @IdOperador");
+	return res.recordset[0];
+}
+
+module.exports = { createUser, findByUsuario, findById };
