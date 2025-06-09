@@ -89,83 +89,134 @@ async function obtenerProcesoPorId(id) {
 
 	if (proceso.recordset.length === 0) return null;
 
-	// Obtener máquinas
+	// Obtener máquinas con sus variables
 	const maquinas = await pool
 		.request()
 		.input("IdProceso", sql.Int, id)
-		.query(
-			`SELECT * FROM ProcesoMaquina WHERE IdProceso = @IdProceso ORDER BY Numero`
-		);
+		.query(`
+			SELECT 
+				PM.*,
+				M.ImagenUrl,
+				MV.Nombre as VariableNombre,
+				MV.ValorMin,
+				MV.ValorMax
+			FROM ProcesoMaquina PM
+			JOIN Maquina M ON PM.IdMaquina = M.IdMaquina
+			LEFT JOIN MaquinaVariable MV ON M.IdMaquina = MV.IdMaquina
+			WHERE PM.IdProceso = @IdProceso
+			ORDER BY PM.Numero
+		`);
 
-	const detalles = [];
-
-	for (let maquina of maquinas.recordset) {
-		const variables = await pool
-			.request()
-			.input("IdMaquina", sql.Int, maquina.IdMaquina)
-			.query(`SELECT * FROM MaquinaVariable WHERE IdMaquina = @IdMaquina`);
-
-		detalles.push({
-			...maquina,
-			variables: variables.recordset, // 🔁 Incluye las variables aquí
-		});
+	// Procesar el resultado para agrupar las variables por máquina
+	const maquinasProcesadas = {};
+	for (const row of maquinas.recordset) {
+		if (!maquinasProcesadas[row.IdMaquina]) {
+			maquinasProcesadas[row.IdMaquina] = {
+				IdMaquina: row.IdMaquina,
+				Numero: row.Numero,
+				Nombre: row.Nombre,
+				Imagen: row.ImagenUrl,
+				variables: []
+			};
+		}
+		
+		if (row.VariableNombre) {
+			maquinasProcesadas[row.IdMaquina].variables.push({
+				nombre: row.VariableNombre,
+				min: row.ValorMin,
+				max: row.ValorMax
+			});
+		}
 	}
 
 	return {
 		IdProceso: proceso.recordset[0].IdProceso,
 		Nombre: proceso.recordset[0].Nombre,
-		Maquinas: detalles, // ✅ Cada máquina con sus variables
+		Maquinas: Object.values(maquinasProcesadas)
 	};
 }
 
 async function actualizarProceso(idProceso, { nombre, maquinas }) {
 	const pool = await getConnection();
+	const transaction = pool.transaction();
 
-	// 1. Actualizar nombre
-	await pool
-		.request()
-		.input("IdProceso", sql.Int, idProceso)
-		.input("Nombre", sql.VarChar(100), nombre).query(`
-			UPDATE Proceso SET Nombre = @Nombre WHERE IdProceso = @IdProceso
-		`);
+	try {
+		await transaction.begin();
 
-	// 2. Eliminar máquinas anteriores
-	await pool.request().input("IdProceso", sql.Int, idProceso).query(`
-			DELETE FROM MaquinaVariable WHERE IdMaquina IN (
-				SELECT IdMaquina FROM ProcesoMaquina WHERE IdProceso = @IdProceso
-			);
-			DELETE FROM ProcesoMaquina WHERE IdProceso = @IdProceso;
-		`);
-
-	// 3. Insertar nuevas máquinas y variables
-	for (let maquina of maquinas) {
-		const maquinaResult = await pool
+		// 1. Actualizar nombre
+		await transaction
 			.request()
 			.input("IdProceso", sql.Int, idProceso)
-			.input("Numero", sql.Int, maquina.numero)
-			.input("Nombre", sql.VarChar(100), maquina.nombre)
-			.input("Imagen", sql.VarChar(255), maquina.imagen).query(`
-				INSERT INTO ProcesoMaquina (IdProceso, Numero, Nombre, Imagen)
-				OUTPUT INSERTED.IdMaquina
-				VALUES (@IdProceso, @Numero, @Nombre, @Imagen)
+			.input("Nombre", sql.VarChar(100), nombre)
+			.query(`
+				UPDATE Proceso 
+				SET Nombre = @Nombre 
+				WHERE IdProceso = @IdProceso
 			`);
 
-		const idMaquina = maquinaResult.recordset[0].IdMaquina;
+		// 2. Eliminar máquinas anteriores
+		await transaction
+			.request()
+			.input("IdProceso", sql.Int, idProceso)
+			.query(`
+				DELETE FROM MaquinaVariable 
+				WHERE IdMaquina IN (
+					SELECT IdMaquina FROM ProcesoMaquina WHERE IdProceso = @IdProceso
+				);
+				DELETE FROM ProcesoMaquina WHERE IdProceso = @IdProceso;
+			`);
 
-		for (let variable of maquina.variables) {
-			await pool
+		// 3. Insertar nuevas máquinas y variables
+		for (let maquina of maquinas) {
+			// Primero verificar si la máquina existe por su nombre
+			const maquinaExistente = await transaction
 				.request()
-				.input("IdMaquina", sql.Int, idMaquina)
-				.input("Nombre", sql.VarChar(100), variable.nombre)
-				.input("ValorMin", sql.Decimal(10, 2), variable.min)
-				.input("ValorMax", sql.Decimal(10, 2), variable.max).query(`
-					INSERT INTO MaquinaVariable (IdMaquina, Nombre, ValorMin, ValorMax)
-					VALUES (@IdMaquina, @Nombre, @ValorMin, @ValorMax)
+				.input("Nombre", sql.VarChar(100), maquina.nombre)
+				.query(`
+					SELECT IdMaquina, ImagenUrl FROM Maquina WHERE Nombre = @Nombre
 				`);
-		}
-	}
 
-	return true;
+			if (maquinaExistente.recordset.length === 0) {
+				throw new Error(`La máquina "${maquina.nombre}" no existe`);
+			}
+
+			const idMaquina = maquinaExistente.recordset[0].IdMaquina;
+			const imagenUrl = maquinaExistente.recordset[0].ImagenUrl;
+
+			// Asociar la máquina existente con el proceso
+			await transaction
+				.request()
+				.input("IdProceso", sql.Int, idProceso)
+				.input("IdMaquina", sql.Int, idMaquina)
+				.input("Numero", sql.Int, maquina.numero)
+				.input("Nombre", sql.VarChar(100), maquina.nombre)
+				.input("Imagen", sql.VarChar(255), imagenUrl)
+				.query(`
+					INSERT INTO ProcesoMaquina (IdProceso, IdMaquina, Numero, Nombre, Imagen)
+					VALUES (@IdProceso, @IdMaquina, @Numero, @Nombre, @Imagen)
+				`);
+
+			// Insertar las variables para esta máquina
+			for (let variable of maquina.variables) {
+				await transaction
+					.request()
+					.input("IdMaquina", sql.Int, idMaquina)
+					.input("Nombre", sql.VarChar(100), variable.nombre)
+					.input("ValorMin", sql.Decimal(10, 2), variable.min)
+					.input("ValorMax", sql.Decimal(10, 2), variable.max)
+					.query(`
+						INSERT INTO MaquinaVariable (IdMaquina, Nombre, ValorMin, ValorMax)
+						VALUES (@IdMaquina, @Nombre, @ValorMin, @ValorMax)
+					`);
+			}
+		}
+
+		await transaction.commit();
+		return true;
+	} catch (error) {
+		await transaction.rollback();
+		throw error;
+	}
 }
 
 async function eliminarProceso(id) {
