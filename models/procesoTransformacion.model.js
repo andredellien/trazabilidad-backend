@@ -58,12 +58,18 @@ async function obtenerProcesoDeLote(idLote) {
 
 	const result = await pool.request().input("IdProceso", sql.Int, IdProceso)
 		.query(`
-			SELECT M.IdMaquina, M.Numero, M.Nombre, M.Imagen,
-			       V.Nombre AS NombreVariable, V.ValorMin, V.ValorMax
-			FROM ProcesoMaquina M
-			LEFT JOIN MaquinaVariable V ON V.IdMaquina = M.IdMaquina
-			WHERE M.IdProceso = @IdProceso
-			ORDER BY M.Numero
+			SELECT 
+				PM.IdMaquina,
+				PM.Numero,
+				PM.Nombre,
+				PM.Imagen,
+				PMV.Nombre AS NombreVariable,
+				PMV.ValorMin,
+				PMV.ValorMax
+			FROM ProcesoMaquina PM
+			LEFT JOIN ProcesoMaquinaVariable PMV ON PMV.IdProcesoMaquina = PM.IdProcesoMaquina
+			WHERE PM.IdProceso = @IdProceso
+			ORDER BY PM.Numero
 		`);
 
 	const mapa = new Map();
