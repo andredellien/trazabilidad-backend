@@ -1,6 +1,7 @@
 const path = require("path");
 const fs = require("fs");
 const model = require("../models/procesoTransformacion.model");
+const operadorModel = require("../models/operador.model");
 
 function cargarVariablesEstandar(numeroMaquina) {
 	const ruta = path.join(__dirname, "..", "config", "variablesEstandar.json");
@@ -12,9 +13,16 @@ function cargarVariablesEstandar(numeroMaquina) {
 async function registrarFormulario(req, res) {
 	const { idLote, numeroMaquina } = req.params;
 	const valores = req.body;
+	const idOperador = req.user.id; // Obtener el ID del operador del token
 
 	try {
-		// 🔄 Obtener la lista completa de máquinas del proceso asignado al lote
+		// Verificar que el operador tenga una máquina asignada
+		const operador = await operadorModel.findById(idOperador);
+		if (!operador) {
+			return res.status(404).json({ message: "Operador no encontrado" });
+		}
+
+		// Obtener la lista completa de máquinas del proceso asignado al lote
 		const maquinas = await model.obtenerProcesoDeLote(parseInt(idLote));
 		const maquina = maquinas.find((m) => m.Numero === parseInt(numeroMaquina));
 
@@ -24,10 +32,20 @@ async function registrarFormulario(req, res) {
 				.json({ message: "Máquina no encontrada en el proceso asignado" });
 		}
 
+		// Verificar que el operador esté asignado a esta máquina usando la tabla OperadorMaquina
+		const maquinasAsignadas = await operadorModel.obtenerMaquinasAsignadas(idOperador);
+		const tieneAcceso = maquinasAsignadas.some(m => m.IdMaquina === maquina.IdMaquina);
+
+		if (!tieneAcceso) {
+			return res.status(403).json({ 
+				message: "No tienes permiso para registrar variables de esta máquina" 
+			});
+		}
+
 		const variablesEstandar = maquina.Variables;
 		const nombreMaquina = maquina.Nombre;
 
-		// ✅ Validación: comparar valores ingresados con rango min/max
+		// Validación: comparar valores ingresados con rango min/max
 		let cumple = true;
 		for (const v of variablesEstandar) {
 			const valorIngresado = valores[v.Nombre];
