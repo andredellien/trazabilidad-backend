@@ -113,16 +113,25 @@ async function update(req, res) {
 async function remove(req, res) {
 	const { id } = req.params;
 	try {
-		const rowsAffected = await loteModel.remove(id);
-		if (rowsAffected === 0) {
-			return res
-				.status(404)
-				.json({ message: "Lote no encontrado para eliminar" });
-		}
+		await loteModel.remove(id);
 		res.json({ message: "Lote eliminado satisfactoriamente" });
 	} catch (error) {
 		console.error("Error al eliminar el lote:", error);
-		res.status(500).json({ message: "Error al eliminar el lote" });
+		
+		// Manejar diferentes tipos de errores
+		if (error.message === "El lote no existe") {
+			return res.status(404).json({ message: error.message });
+		}
+		
+		if (error.message.includes("No se puede eliminar un lote")) {
+			return res.status(400).json({ message: error.message });
+		}
+
+		// Para otros errores
+		res.status(500).json({ 
+			message: "Error al eliminar el lote",
+			error: error.message 
+		});
 	}
 }
 

@@ -186,35 +186,89 @@ async function update(
 
 async function remove(id) {
 	const pool = await getConnection();
+	const transaction = pool.transaction();
 
-	const prev = await pool
-		.request()
-		.input("IdLote", sql.Int, id)
-		.query(
-			`SELECT IdMateriaPrima, Cantidad FROM LoteMateriaPrima WHERE IdLote = @IdLote`
-		);
+	try {
+		// Iniciar la transacción
+		await transaction.begin();
 
-	for (let old of prev.recordset) {
-		await pool
+		// 1. Verificar si el lote existe
+		const lote = await transaction
 			.request()
-			.input("IdMateriaPrima", sql.Int, old.IdMateriaPrima)
-			.input("Cantidad", sql.Decimal(10, 2), old.Cantidad).query(`
-				UPDATE MateriaPrima
-				SET Cantidad = Cantidad + @Cantidad
-				WHERE IdMateriaPrima = @IdMateriaPrima
-			`);
+			.input("IdLote", sql.Int, id)
+			.query("SELECT Estado FROM Lote WHERE IdLote = @IdLote");
+
+		if (lote.recordset.length === 0) {
+			await transaction.rollback();
+			throw new Error("El lote no existe");
+		}
+
+		// 2. Verificar si el lote está en un estado que permita su eliminación
+		const estado = lote.recordset[0].Estado;
+		if (estado === "En Proceso" || estado === "Certificado") {
+			await transaction.rollback();
+			throw new Error("No se puede eliminar un lote que está en proceso o certificado");
+		}
+
+		// 3. Verificar si hay registros de transformación
+		const transformaciones = await transaction
+			.request()
+			.input("IdLote", sql.Int, id)
+			.query("SELECT COUNT(*) as count FROM ProcesoMaquinaRegistro WHERE IdLote = @IdLote");
+
+		if (transformaciones.recordset[0].count > 0) {
+			await transaction.rollback();
+			throw new Error("No se puede eliminar un lote que tiene registros de transformación");
+		}
+
+		// 4. Obtener las materias primas asociadas
+		const prev = await transaction
+			.request()
+			.input("IdLote", sql.Int, id)
+			.query(
+				`SELECT IdMateriaPrima, Cantidad FROM LoteMateriaPrima WHERE IdLote = @IdLote`
+			);
+
+		// 5. Devolver las cantidades a las materias primas
+		for (let old of prev.recordset) {
+			await transaction
+				.request()
+				.input("IdMateriaPrima", sql.Int, old.IdMateriaPrima)
+				.input("Cantidad", sql.Decimal(10, 2), old.Cantidad)
+				.query(`
+					UPDATE MateriaPrima
+					SET Cantidad = Cantidad + @Cantidad
+					WHERE IdMateriaPrima = @IdMateriaPrima
+				`);
+		}
+
+		// 6. Eliminar registros relacionados
+		await transaction
+			.request()
+			.input("IdLote", sql.Int, id)
+			.query(`DELETE FROM LoteMateriaPrima WHERE IdLote = @IdLote`);
+
+		// 7. Eliminar el lote
+		const deleteResult = await transaction
+			.request()
+			.input("IdLote", sql.Int, id)
+			.query(`DELETE FROM Lote WHERE IdLote = @IdLote`);
+
+		if (deleteResult.rowsAffected[0] === 0) {
+			await transaction.rollback();
+			throw new Error("Error al eliminar el lote");
+		}
+
+		// Confirmar la transacción
+		await transaction.commit();
+		return true;
+	} catch (error) {
+		// Si hay un error, hacer rollback
+		if (transaction._activeRequest) {
+			await transaction.rollback();
+		}
+		throw error;
 	}
-
-	await pool
-		.request()
-		.input("IdLote", sql.Int, id)
-		.query(`DELETE FROM LoteMateriaPrima WHERE IdLote = @IdLote`);
-	const deleteResult = await pool
-		.request()
-		.input("IdLote", sql.Int, id)
-		.query(`DELETE FROM Lote WHERE IdLote = @IdLote`);
-
-	return deleteResult.rowsAffected[0];
 }
 
 module.exports = {

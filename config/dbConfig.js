@@ -1,11 +1,12 @@
 // config/dbConfig.js
 const sql = require("mssql");
+require('dotenv').config();
 
 const dbSettings = {
-	user: "app_user", // Ajusta a tus valores reales
-	password: "Password123!", // Ajusta a tus valores reales
-	server: "localhost",
-	database: "TrazabilidadDB",
+	user: process.env.DB_USER,
+	password: process.env.DB_PASSWORD,
+	server: process.env.DB_SERVER,
+	database: process.env.DB_NAME,
 	options: {
 		trustServerCertificate: true,
 		encrypt: true,
