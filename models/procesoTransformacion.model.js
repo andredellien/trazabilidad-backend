@@ -9,20 +9,40 @@ async function registrarFormulario({
 }) {
 	const pool = await getConnection();
 
+	// Primero obtener el IdProcesoMaquina correspondiente
+	const procesoMaquina = await pool
+		.request()
+		.input("IdLote", sql.Int, IdLote)
+		.input("NumeroMaquina", sql.Int, NumeroMaquina)
+		.query(`
+			SELECT PM.IdProcesoMaquina
+			FROM ProcesoMaquina PM
+			JOIN Lote L ON L.IdProceso = PM.IdProceso
+			WHERE L.IdLote = @IdLote AND PM.Numero = @NumeroMaquina
+		`);
+
+	if (procesoMaquina.recordset.length === 0) {
+		throw new Error("No se encontró la máquina en el proceso");
+	}
+
+	const IdProcesoMaquina = procesoMaquina.recordset[0].IdProcesoMaquina;
+
 	const result = await pool
 		.request()
 		.input("IdLote", sql.Int, IdLote)
 		.input("NumeroMaquina", sql.Int, NumeroMaquina)
 		.input("NombreMaquina", sql.VarChar(100), NombreMaquina)
+		.input("IdProcesoMaquina", sql.Int, IdProcesoMaquina)
 		.input(
 			"VariablesIngresadas",
 			sql.NVarChar(sql.MAX),
 			JSON.stringify(VariablesIngresadas)
 		)
-		.input("CumpleEstandar", sql.Bit, CumpleEstandar).query(`
+		.input("CumpleEstandar", sql.Bit, CumpleEstandar)
+		.query(`
 			INSERT INTO ProcesoMaquinaRegistro 
-			(IdLote, NumeroMaquina, NombreMaquina, VariablesIngresadas, CumpleEstandar)
-			VALUES (@IdLote, @NumeroMaquina, @NombreMaquina, @VariablesIngresadas, @CumpleEstandar)
+			(IdLote, NumeroMaquina, NombreMaquina, IdProcesoMaquina, VariablesIngresadas, CumpleEstandar)
+			VALUES (@IdLote, @NumeroMaquina, @NombreMaquina, @IdProcesoMaquina, @VariablesIngresadas, @CumpleEstandar)
 		`);
 
 	return result.rowsAffected[0] > 0;
@@ -33,9 +53,13 @@ async function obtenerFormulario(IdLote, NumeroMaquina) {
 	const result = await pool
 		.request()
 		.input("IdLote", sql.Int, IdLote)
-		.input("NumeroMaquina", sql.Int, NumeroMaquina).query(`
-			SELECT * FROM ProcesoMaquinaRegistro 
-			WHERE IdLote = @IdLote AND NumeroMaquina = @NumeroMaquina
+		.input("NumeroMaquina", sql.Int, NumeroMaquina)
+		.query(`
+			SELECT PMR.*, PMV.Nombre as VariableNombre, PMV.ValorMin, PMV.ValorMax
+			FROM ProcesoMaquinaRegistro PMR
+			JOIN ProcesoMaquina PM ON PMR.IdProcesoMaquina = PM.IdProcesoMaquina
+			LEFT JOIN ProcesoMaquinaVariable PMV ON PM.IdProcesoMaquina = PMV.IdProcesoMaquina
+			WHERE PMR.IdLote = @IdLote AND PMR.NumeroMaquina = @NumeroMaquina
 		`);
 
 	if (result.recordset.length === 0) return null;
@@ -56,9 +80,12 @@ async function obtenerProcesoDeLote(idLote) {
 	const IdProceso = procesoIdRes.recordset[0]?.IdProceso;
 	if (!IdProceso) return [];
 
-	const result = await pool.request().input("IdProceso", sql.Int, IdProceso)
+	const result = await pool
+		.request()
+		.input("IdProceso", sql.Int, IdProceso)
 		.query(`
 			SELECT 
+				PM.IdProcesoMaquina,
 				PM.IdMaquina,
 				PM.Numero,
 				PM.Nombre,
@@ -74,8 +101,9 @@ async function obtenerProcesoDeLote(idLote) {
 
 	const mapa = new Map();
 	for (let row of result.recordset) {
-		if (!mapa.has(row.IdMaquina)) {
-			mapa.set(row.IdMaquina, {
+		if (!mapa.has(row.IdProcesoMaquina)) {
+			mapa.set(row.IdProcesoMaquina, {
+				IdProcesoMaquina: row.IdProcesoMaquina,
 				IdMaquina: row.IdMaquina,
 				Numero: row.Numero,
 				Nombre: row.Nombre,
@@ -85,7 +113,7 @@ async function obtenerProcesoDeLote(idLote) {
 		}
 
 		if (row.NombreVariable) {
-			mapa.get(row.IdMaquina).Variables.push({
+			mapa.get(row.IdProcesoMaquina).Variables.push({
 				Nombre: row.NombreVariable,
 				ValorMin: row.ValorMin,
 				ValorMax: row.ValorMax,
@@ -99,5 +127,5 @@ async function obtenerProcesoDeLote(idLote) {
 module.exports = {
 	registrarFormulario,
 	obtenerFormulario,
-	obtenerProcesoDeLote, // ✅ exporta la nueva función
+	obtenerProcesoDeLote,
 };
