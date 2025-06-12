@@ -34,8 +34,8 @@ async function crearProceso({ nombre, maquinas }) {
 			const idMaquina = maquinaExistente.recordset[0].IdMaquina;
 			const imagenUrl = maquinaExistente.recordset[0].ImagenUrl;
 
-			// Asociar la máquina existente con el proceso
-			const result = await transaction
+			// Insertar la máquina en ProcesoMaquina
+			await transaction
 				.request()
 				.input("IdProceso", sql.Int, idProceso)
 				.input("IdMaquina", sql.Int, idMaquina)
@@ -44,23 +44,33 @@ async function crearProceso({ nombre, maquinas }) {
 				.input("Imagen", sql.VarChar(255), imagenUrl)
 				.query(`
 					INSERT INTO ProcesoMaquina (IdProceso, IdMaquina, Numero, Nombre, Imagen)
-					OUTPUT INSERTED.IdProcesoMaquina
 					VALUES (@IdProceso, @IdMaquina, @Numero, @Nombre, @Imagen)
 				`);
 
-			const idProcesoMaquina = result.recordset[0].IdProcesoMaquina;
+			// Obtener el IdMaquina recién insertado
+			const maquinaInsertada = await transaction
+				.request()
+				.input("IdProceso", sql.Int, idProceso)
+				.input("IdMaquina", sql.Int, idMaquina)
+				.query(`
+					SELECT IdMaquina 
+					FROM ProcesoMaquina 
+					WHERE IdProceso = @IdProceso AND IdMaquina = @IdMaquina
+				`);
+
+			const idProcesoMaquina = maquinaInsertada.recordset[0].IdMaquina;
 
 			// Insertar las variables específicas de este proceso y máquina
 			for (let variable of maquina.variables) {
 				await transaction
 					.request()
-					.input("IdProcesoMaquina", sql.Int, idProcesoMaquina)
+					.input("IdMaquina", sql.Int, idProcesoMaquina)
 					.input("Nombre", sql.VarChar(100), variable.nombre)
 					.input("ValorMin", sql.Decimal(10, 2), variable.min)
 					.input("ValorMax", sql.Decimal(10, 2), variable.max)
 					.query(`
-						INSERT INTO ProcesoMaquinaVariable (IdProcesoMaquina, Nombre, ValorMin, ValorMax)
-						VALUES (@IdProcesoMaquina, @Nombre, @ValorMin, @ValorMax)
+						INSERT INTO MaquinaVariable (IdMaquina, Nombre, ValorMin, ValorMax)
+						VALUES (@IdMaquina, @Nombre, @ValorMin, @ValorMax)
 					`);
 			}
 		}
