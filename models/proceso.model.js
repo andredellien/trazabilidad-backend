@@ -150,7 +150,18 @@ async function actualizarProceso(idProceso, { nombre, maquinas }) {
 	try {
 		await transaction.begin();
 
-		// 1. Actualizar nombre
+		// 1. Verificar si hay lotes usando este proceso
+		const lotes = await transaction
+			.request()
+			.input("IdProceso", sql.Int, idProceso)
+			.query("SELECT IdLote FROM Lote WHERE IdProceso = @IdProceso");
+
+		if (lotes.recordset.length > 0) {
+			await transaction.rollback();
+			throw new Error("No se puede editar el proceso porque está siendo usado en lotes activos");
+		}
+
+		// 2. Actualizar nombre
 		await transaction
 			.request()
 			.input("IdProceso", sql.Int, idProceso)
@@ -161,7 +172,7 @@ async function actualizarProceso(idProceso, { nombre, maquinas }) {
 				WHERE IdProceso = @IdProceso
 			`);
 
-		// 2. Eliminar máquinas anteriores
+		// 3. Eliminar máquinas anteriores
 		await transaction
 			.request()
 			.input("IdProceso", sql.Int, idProceso)
@@ -175,7 +186,7 @@ async function actualizarProceso(idProceso, { nombre, maquinas }) {
 				DELETE FROM ProcesoMaquina WHERE IdProceso = @IdProceso;
 			`);
 
-		// 3. Insertar nuevas máquinas y variables
+		// 4. Insertar nuevas máquinas y variables
 		for (let maquina of maquinas) {
 			// Primero verificar si la máquina existe por su nombre
 			const maquinaExistente = await transaction
