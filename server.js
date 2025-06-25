@@ -17,6 +17,12 @@ const verifyToken = require("./middlewares/verifyToken");
 const procesoTransformacionRoutes = require("./routes/procesoTransformacion.routes");
 const procesoEvaluacionRoutes = require("./routes/procesoEvaluacion.routes");
 const maquinaRoutes = require("./routes/maquina.routes");
+const proveedorRoutes = require("./routes/proveedor.routes");
+const pedidoRoutes = require("./routes/pedido.routes");
+const materiaPrimaBaseRoutes = require("./routes/materiaPrimaBase.routes");
+const logMateriaPrimaRoutes = require("./routes/logMateriaPrima.routes");
+const almacenajeRoutes = require("./routes/almacenaje.routes");
+const variableEstandarRoutes = require('./routes/variableEstandar.routes');
 
 // Activar CORS en toda la aplicación
 app.use(cors());
@@ -35,6 +41,12 @@ app.use("/api/proceso-evaluacion", procesoEvaluacionRoutes);
 app.use("/api", maquinaRoutes);
 app.use("/api/procesos", procesoRoutes);
 app.use("/api/maquinas", maquinaRoutes);
+app.use("/api/proveedores", proveedorRoutes);
+app.use("/api/pedido", pedidoRoutes);
+app.use("/api/materia-prima-base", materiaPrimaBaseRoutes);
+app.use("/api/log-materia-prima", logMateriaPrimaRoutes);
+app.use("/api/almacenaje", almacenajeRoutes);
+app.use('/api/variable-estandar', variableEstandarRoutes);
 
 // Iniciar el servidor
 app.listen(PORT, () => {
