@@ -33,8 +33,7 @@ exports.login = async (req, res) => {
 
 		const token = jwt.sign(
 			{ id: user.IdOperador, nombre: user.Nombre, cargo: user.Cargo },
-			JWT_SECRET,
-			{ expiresIn: "1h" }
+			JWT_SECRET
 		);
 		res.json({ token });
 	} catch (err) {

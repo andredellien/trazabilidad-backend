@@ -1,4 +1,5 @@
 const { getConnection, sql } = require("../config/dbConfig");
+const loteModel = require("./lote.model");
 
 async function obtenerEvaluacionesDeLote(idLote) {
 	const pool = await getConnection();
@@ -25,6 +26,18 @@ async function registrarResultadoFinal({ IdLote, EstadoFinal, Motivo }) {
 		.input("IdLote", sql.Int, IdLote)
 		.input("Estado", sql.VarChar(50), EstadoFinal)
 		.query(`UPDATE Lote SET Estado = @Estado WHERE IdLote = @IdLote`);
+
+	// Si el lote fue certificado, actualizar el estado del pedido a 'Produccion Finalizada'
+	if (EstadoFinal && EstadoFinal.toLowerCase() === 'certificado') {
+		// Obtener el IdPedido del lote
+		const lote = await loteModel.findById(IdLote);
+		if (lote && lote.IdPedido) {
+			await pool.request()
+				.input('IdPedido', sql.Int, lote.IdPedido)
+				.input('Estado', sql.VarChar(50), 'Produccion Finalizada')
+				.query('UPDATE Pedido SET Estado = @Estado WHERE IdPedido = @IdPedido');
+		}
+	}
 }
 
 async function obtenerLogCompleto(idLote) {
