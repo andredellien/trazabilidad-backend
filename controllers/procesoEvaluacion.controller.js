@@ -36,7 +36,7 @@ async function finalizarProceso(req, res) {
 			Motivo: motivo,
 		});
 
-		res.json({ message: estado, motivo });
+		res.json({ message: estado + " el proceso ha sido finalizado", motivo });
 	} catch (error) {
 		console.error("Error al finalizar proceso:", error);
 		res.status(500).json({ message: "Error interno" });

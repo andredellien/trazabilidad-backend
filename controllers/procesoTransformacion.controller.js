@@ -68,7 +68,7 @@ async function registrarFormulario(req, res) {
 		});
 
 		if (resultado) {
-			res.status(201).json({ message: "Formulario guardado", cumple });
+			res.status(201).json({ message: "Proceso Completado", cumple });
 		} else {
 			res.status(500).json({ message: "Error al guardar" });
 		}
